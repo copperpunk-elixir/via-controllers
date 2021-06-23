@@ -1,0 +1,78 @@
+defmodule ViaControllers.Pid do
+  defstruct [
+    :kp,
+    :ki,
+    :kd,
+    :ff,
+    :output_min,
+    :output_neutral,
+    :output_max,
+    :integrator_range_min,
+    :integrator_range_max,
+    :integrator_airspeed_min_mps,
+    :pv_integrator,
+    :pv_correction_prev,
+    :output
+  ]
+
+  @spec new(list()) :: struct()
+  def new(config) do
+    output_neutral = Keyword.fetch!(config, :output_neutral)
+
+    %ViaControllers.Pid{
+      kp: Keyword.get(config, :kp, 0),
+      ki: Keyword.get(config, :ki, 0),
+      kd: Keyword.get(config, :kd, 0),
+      ff: Keyword.get(config, :ff, nil),
+      output_min: Keyword.fetch!(config, :output_min),
+      output_neutral: output_neutral,
+      output_max: Keyword.fetch!(config, :output_max),
+      integrator_range_min: -Keyword.get(config, :integrator_range, 0),
+      integrator_range_max: Keyword.get(config, :integrator_range, 0),
+      integrator_airspeed_min_mps: Keyword.get(config, :integrator_airspeed_min_mps, 10000),
+      pv_integrator: 0,
+      pv_correction_prev: 0,
+      output: output_neutral
+    }
+  end
+
+  @spec update(struct(), number(), number(), number(), number()) :: tuple()
+  def update(pid, cmd, value, airspeed_mps, dt_s) do
+    correction = cmd - value
+
+    in_range =
+      ViaUtils.Math.in_range?(
+        correction,
+        pid.integrator_range_min,
+        pid.integrator_range_max
+      )
+
+    pv_add = if in_range, do: correction * dt_s, else: 0
+
+    pv_integrator =
+      if airspeed_mps > pid.integrator_airspeed_min_mps, do: pid.pv_integrator + pv_add, else: 0
+
+    cmd_p = pid.kp * correction
+    cmd_i = pid.ki * pv_integrator
+    cmd_d = if dt_s != 0, do: -pid.kd * (correction - pid.pv_correction_prev) / dt_s, else: 0
+
+    feed_forward =
+      case Map.get(pid, :ff) do
+        nil -> 0
+        f -> f.(value + correction, value, airspeed_mps)
+      end
+
+    output =
+      (cmd_p + cmd_i + cmd_d + feed_forward + pid.output_neutral)
+      |> ViaUtils.Math.constrain(pid.output_min, pid.output_max)
+
+    # if pid.process_variable == :course_rotate do# and pid.control_variable == :thrust do
+    #   Logger.debug("cmd/value/corr/p/i/d/ff/dO/out: #{Common.Utils.eftb(pv_cmd,3)}/#{Common.Utils.eftb(pv_value,3)}/#{Common.Utils.eftb(correction,3)}/#{Common.Utils.eftb(cmd_p, 3)}/#{Common.Utils.eftb(cmd_i, 3)}/#{Common.Utils.eftb(cmd_d, 3)}/#{Common.Utils.eftb(feed_forward,3)}/#{Common.Utils.eftb(delta_output, 3)}/#{Common.Utils.eftb(output, 3)}")
+    # end
+
+    pv_integrator = if pid.ki != 0, do: cmd_i / pid.ki, else: 0
+
+    {%{pid | output: output, pv_correction_prev: correction, pv_integrator: pv_integrator},
+     output}
+  end
+end

@@ -16,19 +16,19 @@ defmodule Scalar do
   end
 
   @spec new(number(), number(), number(), number(), number(), any()) :: struct()
-  def new(output_min, output_neutral, output_max, multiplier, command_rate_max, inital_command \\ nil) do
+  def new(output_min, output_neutral, output_max, multiplier, command_rate_max, initial_command \\ nil) do
     %Scalar{
       output_min: output_min,
       output_neutral: output_neutral,
       output_max: output_max,
       multiplier: multiplier,
       command_rate_max: command_rate_max,
-      output: output_neutral,
-      current_command: inital_command
+      output: initial_command,
+      current_command: initial_command
     }
   end
 
-  @spec update(struct(), number(), number(), number()) :: struct()
+  @spec update(struct(), number(), number(), number()) :: tuple()
   def update(scalar, command, current_value, dt) do
     scalar =
       if is_nil(scalar.current_command), do: %{scalar | current_command: command}, else: scalar
@@ -36,15 +36,15 @@ defmodule Scalar do
     command_min = scalar.current_command - scalar.command_rate_max * dt
     command_max = scalar.current_command + scalar.command_rate_max * dt
 
-    command_rate_controlled = ViaControllers.constrain(command, command_min, command_max)
+    command_rate_controlled = ViaUtils.Math.constrain(command, command_min, command_max)
 
     # Logger.debug("command min/max/rc: #{command_min}/#{command_max}/#{command_rate_controlled}")
 
     output =
       (scalar.multiplier * (command_rate_controlled - current_value) + scalar.output_neutral)
-      |> ViaControllers.constrain(scalar.output_min, scalar.output_max)
+      |> ViaUtils.Math.constrain(scalar.output_min, scalar.output_max)
 
-    %{scalar | output: output, current_command: command_rate_controlled}
+    {%{scalar | output: output, current_command: command_rate_controlled}, output}
   end
 
   @spec output(struct()) :: number()

@@ -1,59 +1,65 @@
-defmodule ViaControllers.FixedWing.RollPitchYawrateThrottle do
+defmodule ViaControllers.FixedWing.RollPitchDeltayawThrottle do
   require Logger
 
-  defstruct roll_scalar: nil, pitch_scalar: nil, yawrate_scalar: nil, throttle_scalar: nil
+  defstruct roll_scalar: nil, pitch_scalar: nil, deltayaw_scalar: nil, throttle_scalar: nil
 
   @spec new(list()) :: struct()
   def new(full_config) do
     roll_config = Keyword.fetch!(full_config, :roll)
     pitch_config = Keyword.fetch!(full_config, :pitch)
-    yawrate_config = Keyword.fetch!(full_config, :yawrate)
+    deltayaw_config = Keyword.fetch!(full_config, :deltayaw)
     throttle_config = Keyword.fetch!(full_config, :throttle)
-    new(roll_config, pitch_config, yawrate_config, throttle_config)
+    new(roll_config, pitch_config, deltayaw_config, throttle_config)
   end
 
   @spec new(list(), list(), list(), list()) :: struct()
-  def new(roll_config, pitch_config, yawrate_config, throttle_config) do
+  def new(roll_config, pitch_config, deltayaw_config, throttle_config) do
     roll_scalar = Scalar.new(roll_config)
     pitch_scalar = Scalar.new(pitch_config)
-    yawrate_scalar = Scalar.new(yawrate_config)
+    deltayaw_scalar = Scalar.new(deltayaw_config)
     throttle_scalar = Scalar.new(throttle_config)
 
-    %ViaControllers.FixedWing.RollPitchYawrateThrottle{
+    %ViaControllers.FixedWing.RollPitchDeltayawThrottle{
       roll_scalar: roll_scalar,
       pitch_scalar: pitch_scalar,
-      yawrate_scalar: yawrate_scalar,
+      deltayaw_scalar: deltayaw_scalar,
       throttle_scalar: throttle_scalar
     }
   end
 
   @spec update(struct(), map(), map(), number(), number()) :: tuple()
-  def update(rpyt, commands, values, _airspeed, dt) do
-    roll_scalar = Scalar.update(rpyt.roll_scalar, commands.roll_rad, values.roll_rad, dt)
-    pitch_scalar = Scalar.update(rpyt.pitch_scalar, commands.pitch_rad, values.pitch_rad, dt)
+  def update(controller, commands, values, _airspeed, dt) do
+    {roll_scalar, rollrate_output_rps} = Scalar.update(controller.roll_scalar, commands.roll_rad, values.roll_rad, dt)
+    {pitch_scalar, pitchrate_output_rps} = Scalar.update(controller.pitch_scalar, commands.pitch_rad, values.pitch_rad, dt)
 
-    yawrate_scalar =
-      Scalar.update(rpyt.yawrate_scalar, commands.yawrate_rps, values.yawrate_rps, dt)
+    {deltayaw_scalar, yawrate_output_rps} =
+      Scalar.update(controller.deltayaw_scalar, commands.deltayaw_rad, 0, dt)
 
-    throttle_scalar =
-      Scalar.update(rpyt.throttle_scalar, commands.throttle_scaled, values.throttle_scaled, dt)
+    {throttle_scalar, throttle_output_scaled} =
+      Scalar.update(controller.throttle_scalar, commands.throttle_scaled, 0, dt)
 
+    output = %{
+      rollrate_rps: rollrate_output_rps,
+      pitchrate_rps: pitchrate_output_rps,
+      yawrate_rps: yawrate_output_rps,
+      throttle_scaled: throttle_output_scaled
+    }
     {%{
-       rpyt
+       controller
        | roll_scalar: roll_scalar,
          pitch_scalar: pitch_scalar,
-         yawrate_scalar: yawrate_scalar,
+         deltayaw_scalar: deltayaw_scalar,
          throttle_scalar: throttle_scalar
-     }, output(rpyt)}
+     }, output}
   end
 
   @spec output(struct()) :: map()
-  def output(rpyt) do
+  def output(controller) do
     %{
-      rollrate_rps: Scalar.output(rpyt.roll_scalar),
-      pitchrate_rps: Scalar.output(rpyt.pitch_scalar),
-      yawrate_rps: Scalar.output(rpyt.yawrate_scalar),
-      throttle_scaled: Scalar.output(rpyt.throttle_scalar)
+      rollrate_rps: Scalar.output(controller.roll_scalar),
+      pitchrate_rps: Scalar.output(controller.pitch_scalar),
+      yawrate_rps: Scalar.output(controller.deltayaw_scalar),
+      throttle_scaled: Scalar.output(controller.throttle_scalar)
     }
   end
 end
