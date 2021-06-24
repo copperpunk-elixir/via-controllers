@@ -8,7 +8,15 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
   def new(config) do
     tecs_energy = ViaControllers.FixedWing.Tecs.Energy.new(config[:tecs_energy])
     tecs_balance = ViaControllers.FixedWing.Tecs.Balance.new(config[:tecs_balance])
-    roll_course_pid = ViaControllers.Pid.new(config[:roll_course])
+
+    roll_course_config =
+      config[:roll_course]
+      |> Keyword.put(:ff, fn cmd, _value, airspeed ->
+        # Logger.debug("ff cmd/as/output: #{Common.Utils.Math.rad2deg(cmd)]/#{airspeed]/#{Common.Utils.Math.rad2deg(:math.atan(cmd*airspeed/Common.Constants.gravity()))}")
+        :math.atan(0.5 * cmd * airspeed / VC.gravity())
+      end)
+
+    roll_course_pid = ViaControllers.Pid.new(roll_course_config)
 
     %ViaControllers.FixedWing.SpeedCourseAltitudeSideslip{
       tecs_energy: tecs_energy,
@@ -32,9 +40,11 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
     # yaw_rad
     # vertical_velocity_mps
 
-
     # Steering
-    deltayaw_rad = ViaUtils.Motion.turn_left_or_right_for_correction(commands.sideslip_rad + values.course_rad - values.yaw_rad)
+    deltayaw_rad =
+      ViaUtils.Motion.turn_left_or_right_for_correction(
+        commands.sideslip_rad + values.course_rad - values.yaw_rad
+      )
 
     delta_course_cmd_rad =
       ViaUtils.Motion.turn_left_or_right_for_correction(commands.course_rad - values.course_rad)
@@ -132,11 +142,12 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
       throttle_scaled: throttle_output_scaled
     }
 
-    controller = %{
+    controller = %{controller |
       tecs_energy: tecs_energy,
       tecs_balance: tecs_balance,
-      roll_course_pid: roll_course_pid,
+      roll_course_pid: roll_course_pid
     }
+
     {controller, output}
   end
 end

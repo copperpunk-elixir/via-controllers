@@ -16,9 +16,7 @@ defmodule FixedWing.SpeedCourseAltitudeSideslip.AttitudeOutputTest do
         altitude_kp: 1.0,
         energy_rate_scalar: 0.004,
         integrator_range: 100,
-        ff: fn _cmd, _value, speed_cmd ->
-          if speed_cmd > 0, do: speed_cmd * speed_cmd / 400.0, else: 0.0
-        end,
+        feed_forward_speed_max_mps: 60.0,
         output_min: -1.0,
         output_max: 1.0,
         output_neutral: -1.0
@@ -41,10 +39,6 @@ defmodule FixedWing.SpeedCourseAltitudeSideslip.AttitudeOutputTest do
         ki: 0.0,
         integrator_range: 0.052,
         integrator_airspeed_min: 5.0,
-        ff: fn cmd, _value, airspeed ->
-          # Logger.debug("ff cmd/as/output: #{Common.Utils.Math.rad2deg(cmd)]/#{airspeed]/#{Common.Utils.Math.rad2deg(:math.atan(cmd*airspeed/Common.Constants.gravity()))}")
-          :math.atan(0.5 * cmd * airspeed / VC.gravity())
-        end,
         output_min: -0.78,
         output_max: 0.78,
         output_neutral: 0.0
@@ -70,7 +64,16 @@ defmodule FixedWing.SpeedCourseAltitudeSideslip.AttitudeOutputTest do
 
     airspeed_mps = 0
     dt_s = 0.1
-    {controller, output} = ViaControllers.FixedWing.SpeedCourseAltitudeSideslip.update(controller, commands, values, airspeed_mps, dt_s)
+
+    {controller, output} =
+      ViaControllers.FixedWing.SpeedCourseAltitudeSideslip.update(
+        controller,
+        commands,
+        values,
+        airspeed_mps,
+        dt_s
+      )
+
     Logger.debug("output: #{ViaUtils.Format.eftb_map(output, 3)}")
 
     assert output.roll_rad > 0

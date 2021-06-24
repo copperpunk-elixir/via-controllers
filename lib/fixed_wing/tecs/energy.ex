@@ -6,7 +6,7 @@ defmodule ViaControllers.FixedWing.Tecs.Energy do
     :altitude_kp,
     :ki,
     :kd,
-    :ff,
+    :feed_forward_multiplier,
     :time_constant,
     :energy_rate_scalar,
     :output_min,
@@ -21,11 +21,18 @@ defmodule ViaControllers.FixedWing.Tecs.Energy do
 
   @spec new(list()) :: struct()
   def new(config) do
+    feed_forward_speed_max_mps = Keyword.get(config, :feed_forward_speed_max_mps, nil)
+
+    feed_forward_multiplier =
+      if is_nil(feed_forward_speed_max_mps),
+        do: 0,
+        else: 1 / (feed_forward_speed_max_mps * feed_forward_speed_max_mps)
+
     %ViaControllers.FixedWing.Tecs.Energy{
       altitude_kp: Keyword.get(config, :altitude_kp, 0),
       ki: Keyword.get(config, :ki, 0),
       kd: Keyword.get(config, :kd, 0),
-      ff: Keyword.get(config, :ff, nil),
+      feed_forward_multiplier: feed_forward_multiplier,
       time_constant: Keyword.get(config, :time_constant, 1.0),
       energy_rate_scalar: Keyword.fetch!(config, :energy_rate_scalar),
       output_min: Keyword.fetch!(config, :output_min),
@@ -97,14 +104,8 @@ defmodule ViaControllers.FixedWing.Tecs.Energy do
     delta_output = (cmd_p + cmd_i + cmd_d) / tecs.time_constant
 
     feed_forward =
-      case Map.get(tecs, :ff) do
-        nil ->
-          0
-
-        f ->
-          f.(energy_rate_sp, energy_rate, cmds.groundspeed_mps)
-          |> ViaUtils.Math.constrain(tecs.output_min, tecs.output_max)
-      end
+      (cmds.groundspeed_mps * cmds.groundspeed_mps * tecs.feed_forward_multiplier)
+      |> ViaUtils.Math.constrain(tecs.output_min, tecs.output_max)
 
     output =
       (feed_forward + delta_output)
