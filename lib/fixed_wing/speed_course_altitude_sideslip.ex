@@ -102,7 +102,7 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
       groundspeed_mps: groundspeed
     }
 
-    {tecs_energy, throttle_output_scaled} =
+    {tecs_energy, thrust_output_scaled} =
       ViaControllers.FixedWing.Tecs.Energy.update(
         controller.tecs_energy,
         energy_cmds,
@@ -139,7 +139,7 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
       roll_rad: roll_output_rad,
       pitch_rad: pitch_output_rad,
       deltayaw_rad: deltayaw_rad,
-      throttle_scaled: throttle_output_scaled
+      thrust_scaled: thrust_output_scaled
     }
 
     controller = %{controller |

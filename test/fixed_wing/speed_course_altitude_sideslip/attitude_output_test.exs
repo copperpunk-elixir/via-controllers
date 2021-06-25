@@ -79,7 +79,7 @@ defmodule FixedWing.SpeedCourseAltitudeSideslip.AttitudeOutputTest do
     assert output.roll_rad > 0
     assert output.pitch_rad > 0
     assert output.deltayaw_rad < 0
-    assert output.throttle_scaled > -1
+    assert output.thrust_scaled > -1
     Process.sleep(100)
   end
 end
