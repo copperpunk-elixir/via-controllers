@@ -29,21 +29,27 @@ defmodule ViaControllers.FixedWing.RollPitchDeltayawThrust do
 
   @spec update(struct(), map(), map(), number(), number()) :: tuple()
   def update(controller, commands, values, _airspeed, dt) do
-    {roll_scalar, rollrate_output_rps} = Scalar.update(controller.roll_scalar, commands.roll_rad, values.roll_rad, dt)
-    {pitch_scalar, pitchrate_output_rps} = Scalar.update(controller.pitch_scalar, commands.pitch_rad, values.pitch_rad, dt)
+    {roll_scalar, rollrate_output_rps} =
+      Scalar.update(controller.roll_scalar, commands.roll_rad, values.roll_rad, dt)
+
+    {pitch_scalar, pitchrate_output_rps} =
+      Scalar.update(controller.pitch_scalar, commands.pitch_rad, values.pitch_rad, dt)
 
     {deltayaw_scalar, yawrate_output_rps} =
       Scalar.update(controller.deltayaw_scalar, commands.deltayaw_rad, 0, dt)
 
-    {thrust_scalar, thrust_output_scaled} =
+    {thrust_scalar, throttle_output_scaled} =
       Scalar.update(controller.thrust_scalar, commands.thrust_scaled, 0, dt)
 
-    output = %{
-      rollrate_rps: rollrate_output_rps,
-      pitchrate_rps: pitchrate_output_rps,
-      yawrate_rps: yawrate_output_rps,
-      thrust_scaled: thrust_output_scaled
-    }
+    output =
+      Map.drop(commands, [:roll_rad, :pitch_rad, :deltayaw_rad, :thrust_scaled])
+      |> Map.merge(%{
+        rollrate_rps: rollrate_output_rps,
+        pitchrate_rps: pitchrate_output_rps,
+        yawrate_rps: yawrate_output_rps,
+        throttle_scaled: throttle_output_scaled
+      })
+
     {%{
        controller
        | roll_scalar: roll_scalar,
@@ -59,7 +65,7 @@ defmodule ViaControllers.FixedWing.RollPitchDeltayawThrust do
       rollrate_rps: Scalar.output(controller.roll_scalar),
       pitchrate_rps: Scalar.output(controller.pitch_scalar),
       yawrate_rps: Scalar.output(controller.deltayaw_scalar),
-      thrust_scaled: Scalar.output(controller.thrust_scalar)
+      throttle_scaled: Scalar.output(controller.thrust_scalar)
     }
   end
 end
