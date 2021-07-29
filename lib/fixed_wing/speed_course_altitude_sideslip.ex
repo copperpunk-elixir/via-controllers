@@ -9,12 +9,12 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
     tecs_energy = ViaControllers.FixedWing.Tecs.Energy.new(config[:tecs_energy])
     tecs_balance = ViaControllers.FixedWing.Tecs.Balance.new(config[:tecs_balance])
 
+    roll_course_ff_function = fn cmd, airspeed ->
+      :math.atan(0.5 * cmd * airspeed / VC.gravity())
+    end
+
     roll_course_config =
-      config[:roll_course]
-      |> Keyword.put(:ff, fn cmd, _value, airspeed ->
-        # Logger.debug("ff cmd/as/output: #{Common.Utils.Math.rad2deg(cmd)]/#{airspeed]/#{Common.Utils.Math.rad2deg(:math.atan(cmd*airspeed/Common.Constants.gravity()))}")
-        :math.atan(0.5 * cmd * airspeed / VC.gravity())
-      end)
+      config[:roll_course] |> Keyword.put(:ff_function, roll_course_ff_function)
 
     roll_course_pid = ViaControllers.Pid.new(roll_course_config)
 
@@ -142,10 +142,11 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
       thrust_scaled: thrust_output_scaled
     }
 
-    controller = %{controller |
-      tecs_energy: tecs_energy,
-      tecs_balance: tecs_balance,
-      roll_course_pid: roll_course_pid
+    controller = %{
+      controller
+      | tecs_energy: tecs_energy,
+        tecs_balance: tecs_balance,
+        roll_course_pid: roll_course_pid
     }
 
     {controller, output}

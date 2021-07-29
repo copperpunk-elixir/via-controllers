@@ -1,9 +1,11 @@
 defmodule ViaControllers.Pid do
+  require Logger
+
   defstruct [
     :kp,
     :ki,
     :kd,
-    :ff_multiplier,
+    :ff_function,
     :output_min,
     :output_neutral,
     :output_max,
@@ -23,7 +25,7 @@ defmodule ViaControllers.Pid do
       kp: Keyword.fetch!(config, :kp),
       ki: Keyword.fetch!(config, :ki),
       kd: Keyword.fetch!(config, :kd),
-      ff_multiplier: Keyword.fetch!(config, :ff_multiplier),
+      ff_function: get_ff_function(config),
       output_min: Keyword.fetch!(config, :output_min),
       output_neutral: output_neutral,
       output_max: Keyword.fetch!(config, :output_max),
@@ -61,7 +63,7 @@ defmodule ViaControllers.Pid do
     # TODO: Incorporate airspeed into this calculate. Use nth-order equation to drop off FF from
     # max_value at airspeed=0, to min_value at airspeed=airspeed_max
     # For now we are ignoring airspeed
-    feed_forward = (value + correction) * pid.ff_multiplier
+    feed_forward = pid.ff_function.(value + correction, airspeed_mps)
 
     output =
       (cmd_p + cmd_i + cmd_d + feed_forward + pid.output_neutral)
@@ -84,5 +86,17 @@ defmodule ViaControllers.Pid do
   @spec reset_integrator(struct()) :: struct()
   def reset_integrator(pid) do
     %{pid | integrator: 0}
+  end
+
+  @spec get_ff_function(list()) :: function()
+  def get_ff_function(config) do
+    with function <- Keyword.get(config, :ff_function) do
+      if is_nil(function) do
+        multiplier = Keyword.fetch!(config, :ff_multiplier)
+        fn (cmd, _airspeed_mps) -> cmd * multiplier end
+      else
+        function
+      end
+    end
   end
 end
