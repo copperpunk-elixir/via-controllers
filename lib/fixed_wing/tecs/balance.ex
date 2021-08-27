@@ -43,7 +43,7 @@ defmodule ViaControllers.FixedWing.Tecs.Balance do
   def update(tecs, cmds, values, _airspeed, dt_s) do
     altitude_corr = cmds.altitude_corr
     alt_rate_sp = altitude_corr*tecs.altitude_kp
-    Logger.debug("alt_rate_sp: #{ViaUtils.Format.eftb(alt_rate_sp,2)}")
+    # Logger.debug("alt_rate_sp: #{ViaUtils.Format.eftb(alt_rate_sp,2)}")
     potential_energy = values.potential_energy
     potential_energy_rate = values.potential_energy_rate
 
@@ -62,7 +62,7 @@ defmodule ViaControllers.FixedWing.Tecs.Balance do
     # Proportional
     cmd_p = balance_corr
     # Integrator
-    Logger.debug("bcorr/pv_int: #{ViaUtils.Format.eftb(balance_corr,3)}/#{ViaUtils.Format.eftb(tecs.integrator_range_max,3)}")
+    # Logger.debug("bcorr/pv_int: #{ViaUtils.Format.eftb(balance_corr,3)}/#{ViaUtils.Format.eftb(tecs.integrator_range_max,3)}")
     in_range = ViaUtils.Math.in_range?(balance_corr, tecs.integrator_range_min, tecs.integrator_range_max)
 
     error_positive = cmd_p > 0
@@ -91,8 +91,8 @@ defmodule ViaControllers.FixedWing.Tecs.Balance do
     output = (cmd_p + cmd_i + cmd_d + cmd_rate) / tecs.time_constant * tecs.balance_rate_scalar
     |> ViaUtils.Math.constrain(tecs.output_min, tecs.output_max)
 
-    Logger.debug("tecs bal err/out: #{ViaUtils.Format.eftb(altitude_corr,2)}/#{ViaUtils.Format.eftb_deg(output,1)}")
-    Logger.debug("p/i/rate/total: #{ViaUtils.Format.eftb(cmd_p,3)}/#{ViaUtils.Format.eftb(cmd_i,3)}/#{ViaUtils.Format.eftb(cmd_d, 3)}/#{ViaUtils.Format.eftb(cmd_rate,3)}/#{ViaUtils.Format.eftb_deg(output, 3)}")
+    # Logger.debug("tecs bal err/out: #{ViaUtils.Format.eftb(altitude_corr,2)}/#{ViaUtils.Format.eftb_deg(output,1)}")
+    # Logger.debug("p/i/rate/total: #{ViaUtils.Format.eftb(cmd_p,3)}/#{ViaUtils.Format.eftb(cmd_i,3)}/#{ViaUtils.Format.eftb(cmd_d, 3)}/#{ViaUtils.Format.eftb(cmd_rate,3)}/#{ViaUtils.Format.eftb_deg(output, 3)}")
     # Logger.debug("p/i/total: #{ViaUtils.Format.eftb_deg(cmd_p,3)}/#{ViaUtils.Format.eftb_deg(cmd_i,3)}/#{ViaUtils.Format.eftb_deg(output, 3)}")
 
     {%{tecs | pv_integrator: pv_integrator, output: output}, output}
