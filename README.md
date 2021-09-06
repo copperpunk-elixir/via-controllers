@@ -10,7 +10,7 @@ by adding `via_controllers` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:via_controllers, "~> 0.1.0"}
+    {:via_controllers, "~> 0.1.1"}
   ]
 end
 ```
