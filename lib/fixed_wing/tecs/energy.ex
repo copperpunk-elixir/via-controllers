@@ -15,7 +15,7 @@ defmodule ViaControllers.FixedWing.Tecs.Energy do
     :integrator_range_max,
     :pv_integrator,
     :pv_correction_prev,
-    :groundspeed_prev,
+    :groundspeed_prev_mps,
     :output
   ]
 
@@ -41,38 +41,63 @@ defmodule ViaControllers.FixedWing.Tecs.Energy do
       integrator_range_max: Keyword.get(config, :integrator_range, 0),
       pv_integrator: 0,
       pv_correction_prev: 0,
-      groundspeed_prev: nil,
+      groundspeed_prev_mps: nil,
       output: Keyword.fetch!(config, :output_neutral)
     }
   end
 
-  @spec update(struct(), map(), map(), number(), number()) :: tuple()
-  def update(tecs, cmds, values, _airspeed, dt_s) do
-    # Speeds are [m/s]
-    # Altitudes are [m]
+  @spec update(struct(), map(), map()) :: tuple()
+  def update(tecs, cmds, values) do
+    %{
+      altitude_kp: altitude_kp,
+      ki: ki,
+      kd: kd,
+      feed_forward_multiplier: feed_forward_multiplier,
+      time_constant: time_constant,
+      energy_rate_scalar: energy_rate_scalar,
+      output_min: output_min,
+      output_max: output_max,
+      integrator_range_min: integrator_range_min,
+      integrator_range_max: integrator_range_max,
+      pv_integrator: pv_integrator,
+      pv_correction_prev: _pv_correction_prev,
+      groundspeed_prev_mps: groundspeed_prev_mps,
+    } = tecs
+
+    %{
+      energy: energy_sp,
+      kinetic_energy_rate: kinetic_energy_rate_sp,
+      altitude_corr_m: altitude_corr_m,
+      groundspeed_mps: cmd_groundspeed_mps
+    } = cmds
+
+    %{
+      energy: energy,
+      potential_energy_rate: potential_energy_rate,
+      groundspeed_mps: groundspeed_mps,
+      # airspeed: airspeed_mps,
+      dt_s: dt_s
+    } = values
+
     # Logger.debug("cmds: #{ViaUtils.Format.eftb_map(cmds, 3)}")
     # Logger.debug("vals: #{ViaUtils.Format.eftb_map(values, 3)}")
-    groundspeed = values.groundspeed_mps
-    energy_rate_scalar = tecs.energy_rate_scalar
 
-    groundspeed_dot =
-      if is_nil(tecs.groundspeed_prev) do
+    groundspeed_dot_mpss =
+      if is_nil(groundspeed_prev_mps) do
         0
       else
-        (groundspeed - tecs.groundspeed_prev) / dt_s
+        (groundspeed_mps - groundspeed_prev_mps) / dt_s
       end
 
-    altitude_corr = cmds.altitude_corr_m
-    alt_rate = altitude_corr * tecs.altitude_kp
+    alt_rate = altitude_corr_m * altitude_kp
     potential_energy_rate_sp = alt_rate * VC.gravity()
 
-    kinetic_energy_rate = groundspeed * groundspeed_dot
-    energy_rate = kinetic_energy_rate + values.potential_energy_rate
+    kinetic_energy_rate = groundspeed_mps * groundspeed_dot_mpss
+    energy_rate = kinetic_energy_rate + potential_energy_rate
 
-    kinetic_energy_rate_sp = cmds.kinetic_energy_rate
     energy_rate_sp = kinetic_energy_rate_sp + potential_energy_rate_sp
 
-    energy_corr = cmds.energy - values.energy
+    energy_corr = energy_sp - energy
     energy_rate_corr = energy_rate_sp - energy_rate
 
     # Logger.debug("e/e_sp/edot/edot_sp: #{Common.Utils.eftb(values.energy,3)}/#{Common.Utils.eftb(cmds.energy,3)}/#{Common.Utils.eftb(energy_rate,3)}/#{Common.Utils.eftb(energy_rate_sp, 3)}")
@@ -83,40 +108,40 @@ defmodule ViaControllers.FixedWing.Tecs.Energy do
     in_range =
       ViaUtils.Math.in_range?(
         energy_corr,
-        tecs.integrator_range_min,
-        tecs.integrator_range_max
+        integrator_range_min,
+        integrator_range_max
       )
 
     pv_integrator =
       if in_range do
         pv_add = energy_corr * dt_s
-        tecs.pv_integrator + pv_add * energy_rate_scalar
+        pv_integrator + pv_add * energy_rate_scalar
       else
-        tecs.pv_integrator
+        pv_integrator
       end
 
     cmd_i =
-      (tecs.ki * pv_integrator)
+      (ki * pv_integrator)
       |> ViaUtils.Math.constrain(-0.4, 0.4)
 
-    cmd_d = energy_rate_corr * tecs.kd * energy_rate_scalar
+    cmd_d = energy_rate_corr * kd * energy_rate_scalar
 
-    delta_output = (cmd_p + cmd_i + cmd_d) / tecs.time_constant
+    delta_output = (cmd_p + cmd_i + cmd_d) / time_constant
 
     feed_forward =
-      (cmds.groundspeed_mps * cmds.groundspeed_mps * tecs.feed_forward_multiplier)
-      |> ViaUtils.Math.constrain(tecs.output_min, tecs.output_max)
+      (cmd_groundspeed_mps * cmd_groundspeed_mps * feed_forward_multiplier)
+      |> ViaUtils.Math.constrain(output_min, output_max)
 
     output =
       (feed_forward + delta_output)
-      |> ViaUtils.Math.constrain(tecs.output_min, tecs.output_max)
+      |> ViaUtils.Math.constrain(output_min, output_max)
 
     # Prevent integrator wind-up
     pv_integrator =
-      if tecs.ki > 0 do
+      if ki > 0 do
         # Logger.debug("pv_int: #{pv_integrator}/ #{cmd_i/tecs.ki}")
         # Common.Utils.Math.constrain(cmd_i/tecs.ki, tecs.output_min, tecs.output_max)
-        cmd_i / tecs.ki
+        cmd_i / ki
       else
         0.0
       end
@@ -126,7 +151,7 @@ defmodule ViaControllers.FixedWing.Tecs.Energy do
     {%{
        tecs
        | output: output,
-         groundspeed_prev: groundspeed,
+         groundspeed_prev_mps: groundspeed_mps,
          pv_correction_prev: energy_corr,
          pv_integrator: pv_integrator
      }, output}

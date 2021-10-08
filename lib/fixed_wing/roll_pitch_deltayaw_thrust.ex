@@ -1,4 +1,6 @@
 defmodule ViaControllers.FixedWing.RollPitchDeltayawThrust do
+  require ViaUtils.Shared.ValueNames, as: SVN
+  require ViaUtils.Shared.GoalNames, as: SGN
   require Logger
 
   defstruct roll_scalar: nil, pitch_scalar: nil, deltayaw_scalar: nil, thrust_scalar: nil
@@ -27,27 +29,41 @@ defmodule ViaControllers.FixedWing.RollPitchDeltayawThrust do
     }
   end
 
-  @spec update(struct(), map(), map(), number(), number()) :: tuple()
-  def update(controller, commands, values, _airspeed, dt) do
+  @spec update(struct(), map(), map()) :: tuple()
+  def update(controller, commands, values) do
+    %{SVN.roll_rad() => roll_rad, SVN.pitch_rad() => pitch_rad, SVN.dt_s() => dt_s} = values
+
+    %{
+      SGN.roll_rad() => cmd_roll_rad,
+      SGN.pitch_rad() => cmd_pitch_rad,
+      SGN.deltayaw_rad() => cmd_deltayaw_rad,
+      SGN.thrust_scaled() => cmd_thrust_scaled
+    } = commands
+
     {roll_scalar, rollrate_output_rps} =
-      Scalar.update(controller.roll_scalar, commands.roll_rad, values.roll_rad, dt)
+      Scalar.update(controller.roll_scalar, cmd_roll_rad, roll_rad, dt_s)
 
     {pitch_scalar, pitchrate_output_rps} =
-      Scalar.update(controller.pitch_scalar, commands.pitch_rad, values.pitch_rad, dt)
+      Scalar.update(controller.pitch_scalar, cmd_pitch_rad, pitch_rad, dt_s)
 
     {deltayaw_scalar, yawrate_output_rps} =
-      Scalar.update(controller.deltayaw_scalar, commands.deltayaw_rad, 0, dt)
+      Scalar.update(controller.deltayaw_scalar, cmd_deltayaw_rad, 0, dt_s)
 
     {thrust_scalar, throttle_output_scaled} =
-      Scalar.update(controller.thrust_scalar, commands.thrust_scaled, 0, dt)
+      Scalar.update(controller.thrust_scalar, cmd_thrust_scaled, 0, dt_s)
 
     output =
-      Map.drop(commands, [:roll_rad, :pitch_rad, :deltayaw_rad, :thrust_scaled])
+      Map.drop(commands, [
+        SGN.roll_rad(),
+        SGN.pitch_rad(),
+        SGN.deltayaw_rad(),
+        SGN.thrust_scaled()
+      ])
       |> Map.merge(%{
-        rollrate_rps: rollrate_output_rps,
-        pitchrate_rps: pitchrate_output_rps,
-        yawrate_rps: yawrate_output_rps,
-        throttle_scaled: throttle_output_scaled
+        SGN.rollrate_rps() => rollrate_output_rps,
+        SGN.pitchrate_rps() => pitchrate_output_rps,
+        SGN.yawrate_rps() => yawrate_output_rps,
+        SGN.throttle_scaled() => throttle_output_scaled
       })
 
     {%{
@@ -62,10 +78,10 @@ defmodule ViaControllers.FixedWing.RollPitchDeltayawThrust do
   @spec output(struct()) :: map()
   def output(controller) do
     %{
-      rollrate_rps: Scalar.output(controller.roll_scalar),
-      pitchrate_rps: Scalar.output(controller.pitch_scalar),
-      yawrate_rps: Scalar.output(controller.deltayaw_scalar),
-      throttle_scaled: Scalar.output(controller.thrust_scalar)
+      SGN.rollrate_rps() => Scalar.output(controller.roll_scalar),
+      SGN.pitchrate_rps() => Scalar.output(controller.pitch_scalar),
+      SGN.yawrate_rps() => Scalar.output(controller.deltayaw_scalar),
+      SGN.throttle_scaled() => Scalar.output(controller.thrust_scalar)
     }
   end
 end
