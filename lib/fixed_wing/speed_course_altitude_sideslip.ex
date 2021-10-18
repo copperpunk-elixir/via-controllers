@@ -11,8 +11,10 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
     tecs_energy = ViaControllers.FixedWing.Tecs.Energy.new(config[:tecs_energy])
     tecs_balance = ViaControllers.FixedWing.Tecs.Balance.new(config[:tecs_balance])
 
+    course_time_constant_s = config[:roll_course][:time_constant_s]
+
     roll_course_ff_function = fn cmd, airspeed ->
-      :math.atan(0.5 * cmd * airspeed / VC.gravity())
+      :math.atan(cmd / course_time_constant_s * airspeed / VC.gravity())
     end
 
     roll_course_config =
@@ -33,7 +35,7 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
     # groundspeed_mps
     # course_rad
     # altitude_m
-    # sideslip_rad
+    # sideslip_ra   d
 
     # Values:
     # groundspeed_mps
@@ -59,6 +61,17 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
     } = commands
 
     # Steering
+    # dyaw = cmd_sideslip_rad + course_rad - yaw_rad
+    # dyaw_left_right = ViaUtils.Motion.turn_left_or_right_for_correction(dyaw)
+
+    # Logger.debug(
+    #   "yaw/sdslp_cmd/dyaw/dyaw_lr: #{ViaUtils.Format.eftb_deg(yaw_rad, 1)}/#{ViaUtils.Format.eftb_deg(cmd_sideslip_rad, 1)}/#{ViaUtils.Format.eftb_deg(dyaw, 1)}/#{ViaUtils.Format.eftb_deg(dyaw_left_right, 1)}"
+    # )
+
+    # Logger.debug(
+    #   "crs/crs_cmd: #{ViaUtils.Format.eftb_deg(course_rad, 1)}/#{ViaUtils.Format.eftb_deg(cmd_course_rad, 1)}"
+    # )
+
     deltayaw_rad =
       ViaUtils.Motion.turn_left_or_right_for_correction(cmd_sideslip_rad + course_rad - yaw_rad)
 
@@ -152,6 +165,8 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
       deltayaw_rad: deltayaw_rad,
       thrust_scaled: thrust_output_scaled
     }
+
+    # Logger.debug("roll cmd: #{ViaUtils.Format.eftb_deg(roll_output_rad, 1)}")
 
     controller = %{
       controller
