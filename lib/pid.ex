@@ -38,8 +38,8 @@ defmodule ViaControllers.Pid do
     }
   end
 
-  @spec update(struct(), number(), number(), number(), number()) :: tuple()
-  def update(pid, cmd, value, airspeed_mps, dt_s) do
+  @spec update(struct(), number(), number(), number(), number(), boolean()) :: tuple()
+  def update(pid, cmd, value, airspeed_mps, dt_s, debug \\ false) do
     correction = cmd - value
 
     in_range =
@@ -69,9 +69,11 @@ defmodule ViaControllers.Pid do
       (cmd_p + cmd_i + cmd_d + feed_forward + pid.output_neutral)
       |> ViaUtils.Math.constrain(pid.output_min, pid.output_max)
 
-    # if pid.process_variable == :course_rotate do# and pid.control_variable == :thrust do
-    #   Logger.debug("cmd/value/corr/p/i/d/ff/dO/out: #{Common.Utils.eftb(cmd,3)}/#{Common.Utils.eftb(value,3)}/#{Common.Utils.eftb(correction,3)}/#{Common.Utils.eftb(cmd_p, 3)}/#{Common.Utils.eftb(cmd_i, 3)}/#{Common.Utils.eftb(cmd_d, 3)}/#{Common.Utils.eftb(feed_forward,3)}/#{Common.Utils.eftb(delta_output, 3)}/#{Common.Utils.eftb(output, 3)}")
-    # end
+    if debug do
+      Logger.debug(
+        "cmd/value/corr/p/i/d/ff/out: #{ViaUtils.Format.eftb(cmd, 3)}/#{ViaUtils.Format.eftb(value, 3)}/#{ViaUtils.Format.eftb(correction, 3)}/#{ViaUtils.Format.eftb(cmd_p, 3)}/#{ViaUtils.Format.eftb(cmd_i, 3)}/#{ViaUtils.Format.eftb(cmd_d, 3)}/#{ViaUtils.Format.eftb(feed_forward, 3)}/#{ViaUtils.Format.eftb(output, 3)}"
+      )
+    end
 
     integrator = if pid.ki != 0, do: cmd_i / pid.ki, else: 0
 
@@ -93,7 +95,7 @@ defmodule ViaControllers.Pid do
     with function <- Keyword.get(config, :ff_function) do
       if is_nil(function) do
         multiplier = Keyword.fetch!(config, :ff_multiplier)
-        fn (cmd, _airspeed_mps) -> cmd * multiplier end
+        fn cmd, _airspeed_mps -> cmd * multiplier end
       else
         function
       end

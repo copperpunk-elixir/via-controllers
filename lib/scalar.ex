@@ -1,5 +1,6 @@
 defmodule Scalar do
   require Logger
+
   defstruct output_min: 0,
             output_max: 0,
             output_neutral: 0,
@@ -8,15 +9,29 @@ defmodule Scalar do
             output: 0,
             current_command: 0
 
-
   @spec new(list()) :: struct()
   def new(config) do
     initial_command = Keyword.get(config, :initial_command, nil)
-    new(config[:output_min], config[:output_neutral], config[:output_max], config[:multiplier], config[:command_rate_max], initial_command)
+
+    new(
+      config[:output_min],
+      config[:output_neutral],
+      config[:output_max],
+      config[:multiplier],
+      config[:command_rate_max],
+      initial_command
+    )
   end
 
   @spec new(number(), number(), number(), number(), number(), any()) :: struct()
-  def new(output_min, output_neutral, output_max, multiplier, command_rate_max, initial_command \\ nil) do
+  def new(
+        output_min,
+        output_neutral,
+        output_max,
+        multiplier,
+        command_rate_max,
+        initial_command \\ nil
+      ) do
     %Scalar{
       output_min: output_min,
       output_neutral: output_neutral,
@@ -28,8 +43,8 @@ defmodule Scalar do
     }
   end
 
-  @spec update(struct(), number(), number(), number()) :: tuple()
-  def update(scalar, command, current_value, dt) do
+  @spec update(struct(), number(), number(), number(), boolean()) :: tuple()
+  def update(scalar, command, current_value, dt, debug \\ false) do
     scalar =
       if is_nil(scalar.current_command), do: %{scalar | current_command: command}, else: scalar
 
@@ -38,7 +53,11 @@ defmodule Scalar do
 
     command_rate_controlled = ViaUtils.Math.constrain(command, command_min, command_max)
 
-    # Logger.debug("command min/max/rc: #{command_min}/#{command_max}/#{command_rate_controlled}")
+    if debug do
+      Logger.debug(
+        "command min/max/pre/rc: #{ViaUtils.Format.eftb(command_min, 3)}/#{ViaUtils.Format.eftb(command_max, 3)}/#{ViaUtils.Format.eftb(command, 3)}/#{ViaUtils.Format.eftb(command_rate_controlled, 3)}"
+      )
+    end
 
     output =
       (scalar.multiplier * (command_rate_controlled - current_value) + scalar.output_neutral)
