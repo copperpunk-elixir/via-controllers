@@ -47,6 +47,7 @@ defmodule ViaControllers.FixedWing.Tecs.Balance do
       kd: kd,
       time_constant: time_constant,
       balance_rate_scalar: balance_rate_scalar,
+      min_airspeed_for_climb_mps: min_airspeed_for_climb_mps,
       output_min: output_min,
       output_max: output_max,
       integrator_range_min: integrator_range_min,
@@ -66,30 +67,66 @@ defmodule ViaControllers.FixedWing.Tecs.Balance do
       # kinetic_energy: kinetic_energy,
       potential_energy: potential_energy,
       potential_energy_rate: potential_energy_rate,
+      airspeed_mps: airspeed_mps,
       # groundspeed_mps: groundspeed_mps,
       dt_s: dt_s
     } = values
 
-    alt_rate_sp = altitude_corr * altitude_kp
-    # Logger.debug("alt_rate_sp: #{ViaUtils.Format.eftb(alt_rate_sp,2)}")
+    excess_airspeed_mps =
+      ViaUtils.Math.constrain(airspeed_mps - min_airspeed_for_climb_mps, -5, 5)
+
+    altitude_corr_mult = 0.5 * (:math.sin(excess_airspeed_mps * :math.pi() / 10) + 1)
+
+    # Logger.debug(
+    #   "exs_ap/mult/pre: #{ViaUtils.Format.eftb(excess_airspeed_mps, 3)}/#{ViaUtils.Format.eftb(altitude_corr_mult, 3)}/#{ViaUtils.Format.eftb(altitude_corr_mult * altitude_corr * altitude_kp, 1)}"
+    # )
+
+    alt_rate_sp =
+      (altitude_corr_mult * altitude_corr * altitude_kp) |> ViaUtils.Math.constrain(-5.0, 5.0)
+
+    # if airspeed_mps > min_airspeed_for_climb_mps do
+    #   (altitude_corr * altitude_kp) |> ViaUtils.Math.constrain(-5.0, 5.0)
+    # else
+    #   (altitude_corr * altitude_kp) |> ViaUtils.Math.constrain(-0.5, 0.5)
+    # end
+
+    # Logger.debug(
+    #   "alt_corr/alt_rate_sp: #{ViaUtils.Format.eftb(altitude_corr, 1)}/#{ViaUtils.Format.eftb(alt_rate_sp, 2)}"
+    # )
 
     potential_energy_rate_sp = alt_rate_sp * VC.gravity()
     potential_energy_sp = potential_energy + potential_energy_rate_sp * dt_s
 
     balance_cmd = potential_energy_sp
-    balance_values = potential_energy
-    balance_corr = balance_cmd - balance_values
+    balance_value = potential_energy
+    balance_corr = balance_cmd - balance_value
     balance_rate_cmd = potential_energy_rate_sp
-    balance_rate_values = potential_energy_rate
-    balance_rate_corr = balance_rate_cmd - balance_rate_values
+    balance_rate_value = potential_energy_rate
+    balance_rate_corr = balance_rate_cmd - balance_rate_value
 
-    # Logger.debug("pe_sp/pe: #{ViaUtils.Format.eftb(potential_energy_sp,1)}/#{ViaUtils.Format.eftb(potential_energy,1)}")
-    # Logger.debug("rate: pe_sp/pe: #{ViaUtils.Format.eftb(potential_energy_rate_sp,3)}/#{ViaUtils.Format.eftb(potential_energy_rate,3)}")
+    # Logger.debug(
+    #   "bratecmd/brateval: #{ViaUtils.Format.eftb(balance_rate_cmd, 3)}/#{ViaUtils.Format.eftb(balance_rate_value, 3)}"
+    # )
+
+    # Logger.debug(
+    #   "bcorr/brate_corr: #{ViaUtils.Format.eftb(balance_corr, 3)}/#{ViaUtils.Format.eftb(balance_rate_corr, 3)}/#{ViaUtils.Format.eftb(integrator_range_max, 3)}"
+    # )
+
+    # Logger.debug(
+    #   "pe_sp/pe: #{ViaUtils.Format.eftb(potential_energy_sp, 1)}/#{ViaUtils.Format.eftb(potential_energy, 1)}"
+    # )
+
+    # Logger.debug(
+    #   "rate: pe_sp/pe: #{ViaUtils.Format.eftb(potential_energy_rate_sp, 3)}/#{ViaUtils.Format.eftb(potential_energy_rate, 3)}"
+    # )
 
     # Proportional
     cmd_p = balance_corr
     # Integrator
-    # Logger.debug("bcorr/pv_int: #{ViaUtils.Format.eftb(balance_corr,3)}/#{ViaUtils.Format.eftb(tecs.integrator_range_max,3)}")
+    # Logger.debug(
+    #   "bcorr/pv_int: #{ViaUtils.Format.eftb(balance_corr, 3)}/#{ViaUtils.Format.eftb(tecs.integrator_range_max, 3)}"
+    # )
+
     in_range = ViaUtils.Math.in_range?(balance_corr, integrator_range_min, integrator_range_max)
 
     error_positive = cmd_p > 0
@@ -110,7 +147,7 @@ defmodule ViaControllers.FixedWing.Tecs.Balance do
 
     cmd_i =
       (ki * pv_integrator)
-      |> ViaUtils.Math.constrain(-0.175, 0.175)
+      |> ViaUtils.Math.constrain(-1.0, 1.0)
 
     # Logger.info("cmd i pre/post: #{ViaUtils.Format.Format.eftb(cmd_i_mult*pv_integrator,3)}/#{ViaUtils.Format.eftb(cmd_i, 3)}")
     pv_integrator = if ki != 0, do: cmd_i / ki, else: 0
@@ -124,7 +161,10 @@ defmodule ViaControllers.FixedWing.Tecs.Balance do
       |> ViaUtils.Math.constrain(output_min, output_max)
 
     # Logger.debug("tecs bal err/out: #{ViaUtils.Format.eftb(altitude_corr,2)}/#{ViaUtils.Format.eftb_deg(output,1)}")
-    # Logger.debug("p/i/rate/total: #{ViaUtils.Format.eftb(cmd_p,3)}/#{ViaUtils.Format.eftb(cmd_i,3)}/#{ViaUtils.Format.eftb(cmd_d, 3)}/#{ViaUtils.Format.eftb(cmd_rate,3)}/#{ViaUtils.Format.eftb_deg(output, 3)}")
+    # Logger.debug(
+    #   "p/i/d/total: #{ViaUtils.Format.eftb(cmd_p, 3)}/#{ViaUtils.Format.eftb(cmd_i, 3)}/#{ViaUtils.Format.eftb(cmd_d, 3)}/#{ViaUtils.Format.eftb(output, 3)}/#{ViaUtils.Format.eftb_deg(output, 1)}"
+    # )
+
     # Logger.debug("p/i/total: #{ViaUtils.Format.eftb_deg(cmd_p,3)}/#{ViaUtils.Format.eftb_deg(cmd_i,3)}/#{ViaUtils.Format.eftb_deg(output, 3)}")
 
     {%{tecs | pv_integrator: pv_integrator, output: output}, output}

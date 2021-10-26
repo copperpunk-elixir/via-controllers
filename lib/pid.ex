@@ -40,34 +40,55 @@ defmodule ViaControllers.Pid do
 
   @spec update(struct(), number(), number(), number(), number(), boolean()) :: tuple()
   def update(pid, cmd, value, airspeed_mps, dt_s, debug \\ false) do
+    %{
+      integrator_range_min: integrator_range_min,
+      integrator_range_max: integrator_range_max,
+      integrator: integrator,
+      integrator_airspeed_min_mps: integrator_airspeed_min_mps,
+      kp: kp,
+      ki: ki,
+      kd: kd,
+      correction_prev: correction_prev,
+      ff_function: ff_function,
+      output_min: output_min,
+      output_neutral: output_neutral,
+      output_max: output_max
+    } = pid
+
     correction = cmd - value
 
     in_range =
       ViaUtils.Math.in_range?(
         correction,
-        pid.integrator_range_min,
-        pid.integrator_range_max
+        integrator_range_min,
+        integrator_range_max
       )
+
+    if debug do
+      Logger.debug(
+        "corr/int_max/in_range:  #{ViaUtils.Format.eftb(correction, 3)}/#{ViaUtils.Format.eftb(integrator_range_max, 3)}/#{in_range}"
+      )
+    end
 
     value_add_to_integrator = if in_range, do: correction * dt_s, else: 0
 
     integrator =
-      if airspeed_mps > pid.integrator_airspeed_min_mps,
-        do: pid.integrator + value_add_to_integrator,
+      if airspeed_mps > integrator_airspeed_min_mps,
+        do: integrator + value_add_to_integrator,
         else: 0
 
-    cmd_p = pid.kp * correction
-    cmd_i = pid.ki * integrator
-    cmd_d = if dt_s != 0, do: -pid.kd * (correction - pid.correction_prev) / dt_s, else: 0
+    cmd_p = kp * correction
+    cmd_i = ki * integrator
+    cmd_d = if dt_s != 0, do: -kd * (correction - correction_prev) / dt_s, else: 0
 
     # TODO: Incorporate airspeed into this calculate. Use nth-order equation to drop off FF from
     # max_value at airspeed=0, to min_value at airspeed=airspeed_max
     # For now we are ignoring airspeed
-    feed_forward = pid.ff_function.(value + correction, airspeed_mps)
+    feed_forward = ff_function.(value + correction, airspeed_mps)
 
     output =
-      (cmd_p + cmd_i + cmd_d + feed_forward + pid.output_neutral)
-      |> ViaUtils.Math.constrain(pid.output_min, pid.output_max)
+      (cmd_p + cmd_i + cmd_d + feed_forward + output_neutral)
+      |> ViaUtils.Math.constrain(output_min, output_max)
 
     if debug do
       Logger.debug(
@@ -75,7 +96,7 @@ defmodule ViaControllers.Pid do
       )
     end
 
-    integrator = if pid.ki != 0, do: cmd_i / pid.ki, else: 0
+    integrator = if ki != 0, do: cmd_i / ki, else: 0
 
     {%{pid | output: output, correction_prev: correction, integrator: integrator}, output}
   end
