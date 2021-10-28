@@ -1,4 +1,4 @@
-defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
+defmodule ViaControllers.FixedWing.ScasTecs do
   require Logger
   require ViaUtils.Constants, as: VC
   require ViaUtils.Shared.ValueNames, as: SVN
@@ -22,7 +22,7 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
 
     roll_course_pid = ViaControllers.Pid.new(roll_course_config)
 
-    %ViaControllers.FixedWing.SpeedCourseAltitudeSideslip{
+    %ViaControllers.FixedWing.ScasTecs{
       tecs_energy: tecs_energy,
       tecs_balance: tecs_balance,
       roll_course_pid: roll_course_pid
@@ -31,18 +31,6 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
 
   @spec update(struct(), map(), map()) :: tuple()
   def update(controller, commands, values) do
-    # Commands:
-    # groundspeed_mps
-    # course_rad
-    # altitude_m
-    # sideslip_ra   d
-
-    # Values:
-    # groundspeed_mps
-    # course_rad
-    # altitude_m
-    # yaw_rad
-    # vertical_velocity_mps
     %{
       SVN.course_rad() => course_rad,
       SVN.yaw_rad() => yaw_rad,
@@ -59,6 +47,9 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
       SGN.altitude_m() => cmd_altitude_m,
       SGN.groundspeed_mps() => cmd_groundspeed_mps
     } = commands
+
+    %{tecs_energy: tecs_energy, tecs_balance: tecs_balance, roll_course_pid: roll_course_pid} =
+      controller
 
     # Steering
     # dyaw = cmd_sideslip_rad + course_rad - yaw_rad
@@ -80,7 +71,7 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
 
     {roll_course_pid, roll_output_rad} =
       ViaControllers.Pid.update(
-        controller.roll_course_pid,
+        roll_course_pid,
         delta_course_cmd_rad,
         0,
         airspeed_mps,
@@ -132,7 +123,7 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
 
     {tecs_energy, thrust_output_scaled} =
       ViaControllers.FixedWing.Tecs.Energy.update(
-        controller.tecs_energy,
+        tecs_energy,
         energy_cmds,
         energy_values
       )
@@ -157,7 +148,7 @@ defmodule ViaControllers.FixedWing.SpeedCourseAltitudeSideslip do
 
     {tecs_balance, pitch_output_rad} =
       ViaControllers.FixedWing.Tecs.Balance.update(
-        controller.tecs_balance,
+        tecs_balance,
         balance_cmds,
         balance_values
       )

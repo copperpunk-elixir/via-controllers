@@ -1,4 +1,4 @@
-defmodule FixedWing.SpeedCourseAltitudeSideslip.AttitudeOutputTest do
+defmodule FixedWing.ScasTest.AttitudeOutputTest do
   use ExUnit.Case
   require Logger
   alias ViaControllers.FixedWing.SpeedCourseAltitudeSideslip

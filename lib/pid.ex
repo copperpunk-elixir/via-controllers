@@ -64,11 +64,11 @@ defmodule ViaControllers.Pid do
         integrator_range_max
       )
 
-    if debug do
-      Logger.debug(
-        "corr/int_max/in_range:  #{ViaUtils.Format.eftb(correction, 3)}/#{ViaUtils.Format.eftb(integrator_range_max, 3)}/#{in_range}"
-      )
-    end
+    # if debug do
+    #   Logger.debug(
+    #     "corr/int_min/int_max/in_range:  #{ViaUtils.Format.eftb(correction, 3)}/#{ViaUtils.Format.eftb(integrator_range_min, 3)}#{ViaUtils.Format.eftb(integrator_range_max, 3)}/#{in_range}"
+    #   )
+    # end
 
     value_add_to_integrator = if in_range, do: correction * dt_s, else: 0
 
