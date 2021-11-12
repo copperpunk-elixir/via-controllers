@@ -1,5 +1,6 @@
 defmodule ViaControllers.Pid do
   require Logger
+  require ViaUtils.Shared.ControlTypes, as: SCT
 
   defstruct [
     :kp,
@@ -19,19 +20,19 @@ defmodule ViaControllers.Pid do
 
   @spec new(list()) :: struct()
   def new(config) do
-    output_neutral = Keyword.fetch!(config, :output_neutral)
+    output_neutral = Keyword.fetch!(config, SCT.output_neutral())
 
     %ViaControllers.Pid{
-      kp: Keyword.fetch!(config, :kp),
-      ki: Keyword.fetch!(config, :ki),
-      kd: Keyword.fetch!(config, :kd),
+      kp: Keyword.fetch!(config, SCT.kp()),
+      ki: Keyword.fetch!(config, SCT.ki()),
+      kd: Keyword.fetch!(config, SCT.kd()),
       ff_function: get_ff_function(config),
-      output_min: Keyword.fetch!(config, :output_min),
+      output_min: Keyword.fetch!(config, SCT.output_min()),
       output_neutral: output_neutral,
-      output_max: Keyword.fetch!(config, :output_max),
-      integrator_range_min: -Keyword.fetch!(config, :integrator_range),
-      integrator_range_max: Keyword.fetch!(config, :integrator_range),
-      integrator_airspeed_min_mps: Keyword.fetch!(config, :integrator_airspeed_min_mps),
+      output_max: Keyword.fetch!(config, SCT.output_max()),
+      integrator_range_min: -Keyword.fetch!(config, SCT.integrator_range()),
+      integrator_range_max: Keyword.fetch!(config, SCT.integrator_range()),
+      integrator_airspeed_min_mps: Keyword.fetch!(config, SCT.integrator_airspeed_min_mps()),
       integrator: 0,
       correction_prev: 0,
       output: output_neutral
@@ -113,9 +114,9 @@ defmodule ViaControllers.Pid do
 
   @spec get_ff_function(list()) :: function()
   def get_ff_function(config) do
-    with function <- Keyword.get(config, :ff_function) do
+    with function <- Keyword.get(config, SCT.feed_forward_function()) do
       if is_nil(function) do
-        multiplier = Keyword.fetch!(config, :ff_multiplier)
+        multiplier = Keyword.fetch!(config, SCT.feed_forward_multiplier())
         fn cmd, _airspeed_mps -> cmd * multiplier end
       else
         function
